@@ -1,0 +1,10 @@
+
+{
+    "name" : "Squirtle",
+    "moves" : ["Tackle 30", "WaterGun 40", "TailWhip 0"],
+    "cry" : "Squirt! Squirt!",
+    "stats" : ["Health 50", "Attack 30", "Defense 45", "Speed 35"]
+}
+
+
+
