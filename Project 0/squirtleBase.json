@@ -2,7 +2,7 @@
 {
     "name" : "Squirtle",
     "moves" : ["Tackle 30", "WaterGun 40", "TailWhip 0"],
-    "cry" : "Squirt! Squirt!",
+    "cry" : "Squir, squirt!",
     "stats" : ["Health 50", "Attack 35", "Defense 45", "Speed 35"]
 }
 
