@@ -1,6 +1,5 @@
 {
     "name" : "Bulbasaur",
-    "moves" : ["Tackle 30", "VineWhip 35", "Growth 0"],
     "cry" : "Bulba! Bulba!",
     "stats" : ["Health 60", "Attack 35", "Defense 35", "Speed 30"]
 }

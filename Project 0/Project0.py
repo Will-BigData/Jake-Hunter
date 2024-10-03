@@ -19,23 +19,15 @@ OOP part:
 
 - Trainer Class
     - has Pokemon
-    - has Name
 
 - Rocket Grunt extends Trainer
     - has catchphrase
     - has defeat quote
 
 - Pokemon class
-    - has Moves
     - has Cry (entering battle and fainting)
     - has Attack, Defense, Speed
-
-Important Aspects:
-
-- method to display a pokemon's information
-- method to save a pokemon 
-- method to load a pokemon
-- method loop to handle battling
+    - has a name
 """
 
 import json
@@ -54,10 +46,9 @@ class Trainer:
 
 
 class Pokemon:
-    def __init__(self, name, moves, cry, stats):
+    def __init__(self, name, cry, stats):
 
         self.name = name
-        self.moves = []
         self.cry = cry
         self.maxHealth = 0
         self.current_HP = 0
@@ -65,11 +56,6 @@ class Pokemon:
         self.defense = 0
         self.speed = 0 
         self.battles_won = 0
-
-        for move in moves:
-            moveName = move.split()[0]
-            moveDamage = move.split()[1]
-            self.moves.append(Move(moveName, moveDamage))
 
         for stat in stats:
             stat_type = stat.split()[0]
@@ -108,15 +94,6 @@ class Pokemon:
     # def __str__
 
 
-class Move:
-    def __init__(self, name, dmg):
-        self.name = name
-        self.dmg = dmg
-
-
-
-
-
 def beginSequence():
 
     player_name = input("What's your name?\n")
@@ -143,7 +120,7 @@ def beginSequence():
             pokemon_choice = input("Would you like Squirtle, Charmander, or Bulbasaur?\n")
             loop = True
 
-    starter = Pokemon(data['name'], data['moves'], data['cry'], data['stats'])
+    starter = Pokemon(data['name'], data['cry'], data['stats'])
     player = Trainer(player_name, starter)
 
     loop = True
@@ -165,9 +142,12 @@ def battleSequence(player, rival_pokemon):
     bold_char = '\033[1m'
     end_char = '\033[0m'
 
+    underscores = "--------------------------------------------------"  # 50 underscores
+
     damage_multiplier = -0.35
-    counter_multiplier = 2
-    rest_multiplier = 1.5
+    counter_multiplier = 2.5
+    rest_multiplier = 2
+    recover_percentage = 0.2
 
     # Make sure both Pokemon have full HP
     rival_pokemon.current_HP = rival_pokemon.maxHealth
@@ -178,14 +158,18 @@ def battleSequence(player, rival_pokemon):
     while player.pokemon.current_HP > 0 and rival_pokemon.current_HP > 0:
 
         # use colored underscores to show HP? 
-        print("\n----------------------------------------")   # 40 underscores
+        print("\n" + underscores)   
         print(f"Enemy {rival_pokemon.name}" + "\t\t\t" + format(rival_pokemon.current_HP/rival_pokemon.maxHealth, ".1%"))
-        print("----------------------------------------")
+        print(underscores)
         print(f"{player.pokemon.name}" + "\t\t\t" + format(player.pokemon.current_HP/player.pokemon.maxHealth, ".1%"))
-        print("----------------------------------------")
+        print(underscores)
 
         action = input("\nWhat will you do?\n\n" + '\033[1m' + "Attack\t\tCounter\t\tRest\n\n" + '\033[0m')
         print("\n")
+
+        if action.lower() == "exit":
+            exit()
+            break
 
         # Attack does damage. Highest speed moves first
         # Counter does damage only if attacked. 2x of what was recieved. Always goes first.
@@ -209,25 +193,25 @@ def battleSequence(player, rival_pokemon):
                 else:              # Enemy rests
                     # Enemy restores HP, ally does nothing
                     print(rival_pokemon.name + " takes a brief respite! But " + player.pokemon.name + " tried to counterattack!")
-                    rival_pokemon.changeCurrentHP(0.2 * rival_pokemon.maxHealth)
+                    rival_pokemon.changeCurrentHP(recover_percentage * rival_pokemon.maxHealth)
                 
             elif action.lower() == 'rest':
                 # restore HP
                 if enemy_action == 'attack':
                     # Restore ally HP then ally takes boosted damage
                     print(player.pokemon.name + " momentarily lowers its guard to recover!\n")
-                    player.pokemon.changeCurrentHP(0.2 * player.pokemon.maxHealth)
+                    player.pokemon.changeCurrentHP(recover_percentage * player.pokemon.maxHealth)
                     dmg = player.pokemon.changeCurrentHP(rest_multiplier * damage_multiplier * (rival_pokemon.attack / player.pokemon.defense) * rival_pokemon.attack)
                     print(rival_pokemon.name + " takes the opportunity to deal a massive " + str(-1*round(dmg)) + " damage!\n")
                 elif enemy_action == 'counter':
                     # Restore ally HP, enemy does nothing
                     print(player.pokemon.name + " keeps its distance! But " + rival_pokemon.name + " tried to counter!")
-                    player.pokemon.changeCurrentHP(0.2 * player.pokemon.maxHealth)
+                    player.pokemon.changeCurrentHP(recover_percentage * player.pokemon.maxHealth)
                 else:
                     # Both ally and enemy restore HP
                     print("Both Pokemon are prowling around, sizing each other up.")
-                    player.pokemon.changeCurrentHP(0.2 * player.pokemon.maxHealth)
-                    rival_pokemon.changeCurrentHP(0.2 * rival_pokemon.maxHealth)
+                    player.pokemon.changeCurrentHP(recover_percentage * player.pokemon.maxHealth)
+                    rival_pokemon.changeCurrentHP(recover_percentage * rival_pokemon.maxHealth)
                 
             # Ally attacks first
             else:
@@ -247,8 +231,8 @@ def battleSequence(player, rival_pokemon):
                     # Ally attacks, enemy restores HP
                     dmg = rival_pokemon.changeCurrentHP(damage_multiplier * (player.pokemon.attack / rival_pokemon.defense) * player.pokemon.attack)
                     print(player.pokemon.name + " attacked " + rival_pokemon.name + " for " + str(-1*round(dmg)) + " damage!\n")
-                    print(rival_pokemon.name + " briefly lowers its guard to recover!\n")
-                    rival_pokemon.changeCurrentHP(0.2 * player.pokemon.maxHealth)
+                    print(rival_pokemon.name + " takes a moment to recover some stamina!\n")
+                    rival_pokemon.changeCurrentHP(recover_percentage * player.pokemon.maxHealth)
                     
         # Enemy pokemon faster
         else:       
@@ -259,14 +243,14 @@ def battleSequence(player, rival_pokemon):
                     dmg = player.pokemon.changeCurrentHP(damage_multiplier * (rival_pokemon.attack / player.pokemon.defense) * rival_pokemon.attack)
                     print(rival_pokemon.name + " attacked " + player.pokemon.name + " for " + str(-1*round(dmg)) + " damage!\n")
                     dmg = rival_pokemon.changeCurrentHP(counter_multiplier * damage_multiplier * (player.pokemon.attack / rival_pokemon.defense) * player.pokemon.attack)
-                    print(player.pokemon.name + " attacked " + rival_pokemon.name + " for " + str(-1*round(dmg)) + " damage!\n")
+                    print("A brutal reversal by " + player.pokemon.name + " for " + str(-1*round(dmg)) + " damage!\n")
 
                 elif action == 'rest': 
                     # Enemy attacks, player rests
                     dmg = player.pokemon.changeCurrentHP(damage_multiplier * (rival_pokemon.attack / player.pokemon.defense) * rival_pokemon.attack)
                     print(rival_pokemon.name + " attacked " + player.pokemon.name + " for " + str(-1*round(dmg)) + " damage!\n")
                     print(player.pokemon.name + " backs off to catch its breath.\n")
-                    player.pokemon.changeCurrentHP(0.2 * player.pokemon.maxHealth)
+                    player.pokemon.changeCurrentHP(recover_percentage * player.pokemon.maxHealth)
                     
                 else:
                     # Both take damage 
@@ -283,7 +267,7 @@ def battleSequence(player, rival_pokemon):
                 elif action == 'rest': 
                     # Player restores HP
                     print(player.pokemon.name + " keeps its distance! But " + rival_pokemon.name + " tried to counter!")
-                    player.pokemon.changeCurrentHP(0.2 * player.pokemon.maxHealth)
+                    player.pokemon.changeCurrentHP(recover_percentage * player.pokemon.maxHealth)
                     
                 else:
                     # Ally attacks, enemy counters
@@ -297,29 +281,29 @@ def battleSequence(player, rival_pokemon):
                 if action.lower() == 'counter':   
                     # Enemy restores HP
                     print(rival_pokemon.name + " keeps its distance! But " + player.pokemon.name + " tried to counter!")
-                    rival_pokemon.changeCurrentHP(0.2 * rival_pokemon.maxHealth)
+                    rival_pokemon.changeCurrentHP(recover_percentage * rival_pokemon.maxHealth)
                     
                 elif action == 'rest': 
                     # Both restore HP
                     print("Both Pokemon are prowling around, sizing each other up. ")
-                    player.pokemon.changeCurrentHP(0.2 * player.pokemon.maxHealth)
-                    rival_pokemon.changeCurrentHP(0.2 * rival_pokemon.maxHealth)
+                    player.pokemon.changeCurrentHP(recover_percentage * player.pokemon.maxHealth)
+                    rival_pokemon.changeCurrentHP(recover_percentage * rival_pokemon.maxHealth)
                     
                 else:
                     # Ally attacks, enemy takes bonus resting damage
                     print(rival_pokemon.name + " backs off to catch its breath.\n")
-                    rival_pokemon.changeCurrentHP(0.2 * rival_pokemon.maxHealth)
+                    rival_pokemon.changeCurrentHP(recover_percentage * rival_pokemon.maxHealth)
                     dmg = rival_pokemon.changeCurrentHP(rest_multiplier * damage_multiplier * (player.pokemon.attack / rival_pokemon.defense) * player.pokemon.attack)
                     print("But " + player.pokemon.name + " isn't letting up! " + rival_pokemon.name + " takes a considerable " + str(-1*round(dmg)) + " damage!\n")
                     
                    
 
     print("Battle completed. Results: ")
-    print("\n----------------------------------------")   # 40 underscores
+    print("\n" + underscores)   # 40 underscores
     print(f"Enemy {rival_pokemon.name}" + "\t\t\t" + format(rival_pokemon.current_HP/rival_pokemon.maxHealth, ".1%"))
-    print("----------------------------------------")
+    print(underscores)
     print(f"{player.pokemon.name}" + "\t\t\t" + format(player.pokemon.current_HP/player.pokemon.maxHealth, ".1%"))
-    print("----------------------------------------")
+    print(underscores)
     
 
 def beginFirstBattle(player):
@@ -340,7 +324,7 @@ def beginFirstBattle(player):
         with open("./Project 0/charmanderBase.json", 'r') as file:
                 data = json.load(file)
 
-    rival_pokemon = Pokemon(data['name'], data['moves'], data['cry'], data['stats'])
+    rival_pokemon = Pokemon(data['name'], data['cry'], data['stats'])
     # increase enemy stats per battle that the player has won (can be saved)
     #rival_pokemon.changeMaxHealth()
 

@@ -1,6 +1,5 @@
 {
     "name" : "Charmander",
-    "moves" : ["Scratch 35", "Ember 45", "Growl 0"],
     "cry" : "Ch-char! Charmander!",
     "stats" : ["Health 45", "Attack 45", "Defense 30", "Speed 45"]
 }
