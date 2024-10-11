@@ -2,9 +2,11 @@
 import json
 import os
 import random
+import mysql.connector
+from mysql.connector import Error
 
 
-# Save special utility strings
+# Save special utility/formatting strings
 bold_char = '\033[1m'
 end_char = '\033[0m'
 underscores = "--------------------------------------------------"  # 50 underscores
@@ -12,7 +14,7 @@ tab_spacing = "\t\t\t\t"
 
 class Trainer:
 
-    def __init__(self, name, pokemon = None):
+    def __init__(self, name, battles_won = 0, pokemon = None):
 
         self.name = name
         self.battles_won = 0
@@ -34,7 +36,6 @@ class Pokemon:
         self.attack = 0
         self.defense = 0
         self.speed = 0 
-        #self.battles_won = 0
 
         for stat in stats:
 
@@ -80,77 +81,245 @@ class Pokemon:
 
 def beginSequence():
 
-
-    player_name = input("What's your name?\n")
-    player_name = player_name.strip().title()
-    print("\nYour Pokemon options are: Squirtle, Charmander, or Bulbasaur.\n")
-
-    pokemon_choice = input("Choose wisely!\n")
-    pokemon_choice.strip().title()
-
-    loop = True
-    while loop:
-
-        if pokemon_choice.lower() == "squirtle":
-            with open("./Project 0/squirtleBase.json", 'r') as file:
+    save_option = input("Would you like to load a previous save?\n")
+    if save_option.lower() == "yes":
+        with open("./Project 0/playerSave1.json", 'r') as file:
                 data = json.load(file)
+        pokemon = Pokemon(data['pokemon']['name'], data['pokemon']['cry'], data['pokemon']['stats'])
+        player = Trainer(data['name'], data['battles_won'], pokemon)
+        
+    else:
+        # Basic start
+
+        player_name = input("What's your name?\n")
+        player_name = player_name.strip().title()
+        print("\nYour Pokemon options are: Squirtle, Charmander, or Bulbasaur.\n")
+
+        pokemon_choice = input("Choose wisely!\n")
+        pokemon_choice.strip().title()
+
+        loop = True
+        while loop:
+
+            if pokemon_choice.lower() == "squirtle":
+                with open("./Project 0/squirtleBase.json", 'r') as file:
+                    data = json.load(file)
+                    loop = False
+            elif pokemon_choice.lower() == "charmander":
+                with open("./Project 0/charmanderBase.json", 'r') as file:
+                    data = json.load(file)
+                    loop = False
+            elif pokemon_choice.lower() == "bulbasaur":
+                with open("./Project 0/bulbasaurBase.json", 'r') as file:
+                    data = json.load(file)
+                    loop = False
+            elif pokemon_choice.lower() == "save1":
+                with open("./Project 0/playerSave1.json", 'r') as file:
+                    data = json.load(file)
+                    loop = False
+                pass
+            else:
+                print("Sorry, I didn't catch that.")
+                pokemon_choice = input("Would you like Squirtle, Charmander, or Bulbasaur?\n")
+                loop = True
+
+        starter = Pokemon(data['name'], data['cry'], data['stats'])
+        player = Trainer(player_name, starter)
+
+        # for testing
+        # saveOpportunity(player)
+
+        loop = True
+        while loop:
+
+            response = input("\nAre you ready for your first battle?\n")
+            if response.lower() == "yes":
                 loop = False
-        elif pokemon_choice.lower() == "charmander":
-            with open("./Project 0/charmanderBase.json", 'r') as file:
-                data = json.load(file)
-                loop = False
-        elif pokemon_choice.lower() == "bulbasaur":
+            else:
+                print("Quickly! Prepare yourself!\n")
+
+        # load rival pokemon based on starter choice
+        if starter.name.lower() == "squirtle":
             with open("./Project 0/bulbasaurBase.json", 'r') as file:
-                data = json.load(file)
-                loop = False
+                    data = json.load(file)
+        elif starter.name.lower() == "charmander":
+            with open("./Project 0/squirtleBase.json", 'r') as file:
+                    data = json.load(file)
+        elif starter.name.lower() == "bulbasaur":
+            with open("./Project 0/charmanderBase.json", 'r') as file:
+                    data = json.load(file)
+
+        rival_pokemon = Pokemon(data['name'], data['cry'], data['stats'])
+
+        beginFirstBattle(player, rival_pokemon)
+
+        # Pokemon strength increase (level up)
+        # IF VICTORIOUS, gain exp
+        experienceGain(player.pokemon)
+
+        # Opportunity to save
+        saveOpportunity(player)
+
+
+    connection = initializeDatabase()
+
+    endlessBattleLoop(player, connection)
+
+    if connection.is_connected():
+        connection.close()
+        print("Connection closed.")
+
+
+
+
+def initializeDatabase():
+
+    host = 'localhost'
+    user = 'root'
+    password = '1q2w3e4r'
+    db_name = 'pokemon'
+
+    conn = create_connection(host, user, password, db_name)
+    create_database(conn, db_name)
+    
+    # TODO
+    query = f"CREATE DATABASE IF NOT EXISTS {db_name};"
+    execute_query(conn, query)
+    query = """ CREATE TABLE IF NOT EXISTS pokemon 
+        (dex_number INT PRIMARY KEY, 
+        evolution_stage INT,
+        name VARCHAR(255) NOT NULL, 
+        max_hp INT, 
+        attack INT, 
+        defense INT, 
+        speed INT); """
+    execute_query(conn, query)
+
+    insert_pokemon(conn, 1, 1, 'Bulbasaur', 60, 35, 35, 30)
+    insert_pokemon(conn, 2, 2, 'Ivysaur', 80, 55, 55, 50)
+    insert_pokemon(conn, 3, 3, 'Venusaur', 100, 75, 75, 70)
+    insert_pokemon(conn, 4, 1, 'Charmander', 45, 45, 30, 45)
+    insert_pokemon(conn, 7, 1, 'Squirtle', 50, 35, 45, 35)
+    insert_pokemon(conn, 19, 1, 'Rattata', 30, 40, 30, 50)
+    insert_pokemon(conn, 21, 1, 'Spearow', 25, 45, 15, 55)
+    insert_pokemon(conn, 25, 1, 'Pikachu', 45, 50, 35, 50)
+    insert_pokemon(conn, 37, 1, 'Vulpix', 40, 45, 30, 45)
+    insert_pokemon(conn, 39, 1, 'Jigglypuff', 55, 30, 40, 35)
+    insert_pokemon(conn, 52, 1, 'Meowth', 35, 50, 30, 45)
+    insert_pokemon(conn, 92, 1, 'Gastly', 20, 55, 15, 45)
+    insert_pokemon(conn, 93, 2, 'Haunter', 40, 75, 35, 65)
+    insert_pokemon(conn, 94, 3, 'Gengar', 60, 95, 55, 85)
+    insert_pokemon(conn, 129, 1, 'Magikarp', 10, 5, 5, 10)
+    insert_pokemon(conn, 130, 2, 'Gyarados', 75, 75, 60, 75)
+
+    return conn
+
+
+def insert_pokemon(conn, dex_number, evo_stage, name, max_hp, attack, defense, speed):
+
+    query = """
+    INSERT IGNORE INTO pokemon (dex_number, evolution_stage, name, max_hp, attack, defense, speed)
+    VALUES (%s, %s, %s, %s, %s, %s, %s);
+    """
+    data = (dex_number, evo_stage, name, max_hp, attack, defense, speed)
+    execute_query(conn, query, data)
+
+
+def endlessBattleLoop(player, connection):
+
+    player_name = player.name
+    player_pokemon = player.pokemon
+    battles_won = player.battles_won
+
+    # Load opponent
+    testQuery = "SELECT * FROM pokemon;"
+    query = """ 
+    SELECT * FROM pokemon 
+    WHERE evolution_stage = 1
+    ORDER BY RAND()
+    LIMIT 1;
+    """
+    retrieved = read_data(connection, query)
+
+    # print opponent's pokemon
+    print(retrieved)
+
+    # Increase opponent power per battles_won
+    exp_battle_multiplier = 5
+    increase = player.battles_won * exp_battle_multiplier
+    print("BATTLES WON = " + str(player.battles_won))
+
+    retrieved = retrieved[0]
+    opponent_pokemon = Pokemon(retrieved[1], "", ["Health " + str(retrieved[3]+increase),
+                                                "Attack " + str(retrieved[4]+increase),
+                                                "Defense " + str(retrieved[5]+increase),
+                                                "Speed " + str(retrieved[6]+increase)])
+
+    print(opponent_pokemon.attack)
+
+
+    # Battle
+
+    # Save
+
+    # Continue/Exit
+
+    pass
+
+
+def create_connection(host_name, user_name, user_password, db_name):
+
+    connection = None
+    try:
+        connection = mysql.connector.connect(
+            host=host_name, user=user_name, 
+            password=user_password
+        )
+        print("Connection to database successful")
+
+    except Error as e:
+        print("ERROR: " + e)
+
+    return connection
+
+def create_database(connection, db_name):
+    cursor = connection.cursor()
+    try:
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name};")
+        print(f"Database '{db_name}' created or already exists")
+        cursor.execute(f"USE {db_name};")
+    except Error as e:
+        print(f"ERROR: '{e}'")
+
+def execute_query(connection, query, data=None):
+    cursor = connection.cursor()
+    try:
+        if data:
+            cursor.execute(query, data)
         else:
-            print("Sorry, I didn't catch that.")
-            pokemon_choice = input("Would you like Squirtle, Charmander, or Bulbasaur?\n")
-            loop = True
+            cursor.execute(query)
+        connection.commit()
+        #print("Query executed successfully")
+    except Error as e:
+        print(f"ERROR: '{e}'")
 
-    starter = Pokemon(data['name'], data['cry'], data['stats'])
-    player = Trainer(player_name, starter)
+def read_data(connection, query):
+    cursor = connection.cursor()
 
-    loop = True
-    while loop:
+    cursor.execute(query)
+    data = cursor.fetchall()
+    print("Data fetched successfully")
 
-        response = input("\nAre you ready for your first battle?\n")
-        if response.lower() == "yes":
-            loop = False
-        else:
-            print("Quickly! Prepare yourself!\n")
+    return data
 
-    # load rival pokemon based on starter choice
-    if starter.name.lower() == "squirtle":
-        with open("./Project 0/bulbasaurBase.json", 'r') as file:
-                data = json.load(file)
-    elif starter.name.lower() == "charmander":
-        with open("./Project 0/squirtleBase.json", 'r') as file:
-                data = json.load(file)
-    elif starter.name.lower() == "bulbasaur":
-        with open("./Project 0/charmanderBase.json", 'r') as file:
-                data = json.load(file)
+    #for row in rows:
+        #print(row)
 
-    rival_pokemon = Pokemon(data['name'], data['cry'], data['stats'])
-
-    # increase enemy stats per battle that the player has won (can be saved)
-    #rival_pokemon.changeMaxHealth()
-
-    beginFirstBattle(player, rival_pokemon)
-
-    # Pokemon strength increase (level up)
-    # IF VICTORIOUS, gain exp
-    experienceGain(player.pokemon)
-
-    # Opportunity to save
-    saveOpportunity(player)
-
-    # TODO start next battle
 
 def experienceGain(pokemon):
 
-    print("Your " + pokemon.name + " has gotten so much stronger! Which stat will " + pokemon.name + " focus on now?\n")
-    stat_choice = input(bold_char + "Health\t\tAttack\t\tDefense\t\tSpeed\n\n" + end_char)
+    print("\nYour " + pokemon.name + " has gotten so much stronger! Which stat will " + pokemon.name + " focus on now?\n")
+    stat_choice = input(bold_char + "Health\t\tAttack\t\tDefense\t\tSpeed\n" + end_char)
     stat_choice.strip().lower()
 
     if stat_choice == 'health':
@@ -171,8 +340,17 @@ def saveOpportunity(player):
     save.strip().lower()
 
     if save == 'yes' or save == 'y':
-        #save
-        pass
+        # gather data and save
+        
+        pokemonToSave = {"name":player.pokemon.name, "cry":player.pokemon.cry, 
+                "stats":["Health " + str(player.pokemon.maxHealth), "Attack " + str(player.pokemon.attack), 
+                "Defense " + str(player.pokemon.defense), "Speed " + str(player.pokemon.speed)]}
+        trainerToSave = {"name":player.name, "battles_won":player.battles_won, "pokemon":pokemonToSave}
+
+        file_name = "Project 0/playerSave1.json"
+        with open(file_name, 'w') as json_file:
+            json.dump(trainerToSave, json_file, indent=4)
+
     elif save == 'no' or save == 'n':
         # do not save
         pass
@@ -203,7 +381,8 @@ def battleSequence(player, rival_pokemon):
         print(f"{player.pokemon.name}" + tab_spacing + format(player.pokemon.current_HP/player.pokemon.maxHealth, ".1%"))
         print(underscores)
 
-        action = input("\nWhat will you do?\n\n" + bold_char + "Attack\t\tCounter\t\tRest\n\n" + '\033[0m \n\n')
+        action = input("\nWhat will you do?\n\n" + bold_char + "Attack\t\tCounter\t\tRest\n\n" + '\033[0m')
+        print("\n\n")
 
         if action.lower() == "exit":
             exit()
@@ -212,7 +391,7 @@ def battleSequence(player, rival_pokemon):
         # Counter does damage only if attacked. 2x of what was recieved. Always goes first.
         # Rest restores 20% HP. Vulnerable to attacks by 1.5x while resting
 
-        # TODO enemy class has attribute of an action list
+        # TODO enemy class has an attribute of 'action list' (to influence RNG choices)
 
         enemy_options = ["attack", "counter", "rest"]
         enemy_action = random.choice(enemy_options)
