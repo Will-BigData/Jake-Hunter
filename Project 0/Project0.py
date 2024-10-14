@@ -1,16 +1,15 @@
-
 import json
 import os
 import random
 import mysql.connector
 from mysql.connector import Error
 
-
 # Save special utility/formatting strings
 bold_char = '\033[1m'
 end_char = '\033[0m'
 underscores = "--------------------------------------------------"  # 50 underscores
 tab_spacing = "\t\t\t\t"
+
 
 class Trainer:
 
@@ -51,7 +50,6 @@ class Pokemon:
             elif stat_type == "Health":
                 self.maxHealth = int(value)
                 self.current_HP = int(value)
-            # error handling here TODO
 
     def changeMaxHealth(self, value):
         self.maxHealth += value
@@ -74,9 +72,6 @@ class Pokemon:
             self.current_HP = 0
 
         return value
-
-    # def __str__
-
 
 
 def beginSequence():
@@ -124,10 +119,7 @@ def beginSequence():
                 loop = True
 
         starter = Pokemon(data['name'], data['cry'], data['stats'])
-        player = Trainer(player_name, starter)
-
-        # for testing
-        # saveOpportunity(player)
+        player = Trainer(player_name, 0, starter)
 
         loop = True
         while loop:
@@ -151,11 +143,12 @@ def beginSequence():
 
         rival_pokemon = Pokemon(data['name'], data['cry'], data['stats'])
 
-        beginFirstBattle(player, rival_pokemon)
+        battle_result = beginFirstBattle(player, rival_pokemon)
 
         # Pokemon strength increase (level up)
         # IF VICTORIOUS, gain exp
-        experienceGain(player.pokemon)
+        if battle_result == 1:
+            experienceGain(player.pokemon)
 
         # Opportunity to save
         saveOpportunity(player)
@@ -170,8 +163,6 @@ def beginSequence():
         print("Connection closed.")
 
 
-
-
 def initializeDatabase():
 
     host = 'localhost'
@@ -182,7 +173,6 @@ def initializeDatabase():
     conn = create_connection(host, user, password, db_name)
     create_database(conn, db_name)
     
-    # TODO
     query = f"CREATE DATABASE IF NOT EXISTS {db_name};"
     execute_query(conn, query)
     query = """ CREATE TABLE IF NOT EXISTS pokemon 
@@ -193,6 +183,7 @@ def initializeDatabase():
         attack INT, 
         defense INT, 
         speed INT); """
+
     execute_query(conn, query)
 
     insert_pokemon(conn, 1, 1, 'Bulbasaur', 60, 35, 35, 30)
@@ -232,39 +223,44 @@ def endlessBattleLoop(player, connection):
     battles_won = player.battles_won
 
     # Load opponent
-    testQuery = "SELECT * FROM pokemon;"
+    #testQuery = "SELECT * FROM pokemon;"
     query = """ 
     SELECT * FROM pokemon 
     WHERE evolution_stage = 1
     ORDER BY RAND()
     LIMIT 1;
     """
-    retrieved = read_data(connection, query)
-
-    # print opponent's pokemon
-    print(retrieved)
+    retrieved = read_data(connection, query)[0]
 
     # Increase opponent power per battles_won
     exp_battle_multiplier = 5
     increase = player.battles_won * exp_battle_multiplier
-    print("BATTLES WON = " + str(player.battles_won))
 
-    retrieved = retrieved[0]
-    opponent_pokemon = Pokemon(retrieved[1], "", ["Health " + str(retrieved[3]+increase),
+    # TODO what to do with cry?
+    cry = retrieved[1]
+
+    opponent_pokemon = Pokemon(retrieved[2], cry, ["Health " + str(retrieved[3]+increase),
                                                 "Attack " + str(retrieved[4]+increase),
                                                 "Defense " + str(retrieved[5]+increase),
                                                 "Speed " + str(retrieved[6]+increase)])
 
-    print(opponent_pokemon.attack)
-
-
     # Battle
+    battle_result = battleSequence(player, opponent_pokemon)
+
+    # Experience gain
+    experienceGain(player.pokemon)
 
     # Save
+    player.battles_won += 1
+    saveOpportunity(player)
 
     # Continue/Exit
-
-    pass
+    choice = input("\nContinue?\n")
+    if choice.lower() == 'yes':
+        endlessBattleLoop(player, connection)
+    else:
+        print("Terminating program.")
+        pass
 
 
 def create_connection(host_name, user_name, user_password, db_name):
@@ -303,23 +299,22 @@ def execute_query(connection, query, data=None):
     except Error as e:
         print(f"ERROR: '{e}'")
 
-def read_data(connection, query):
-    cursor = connection.cursor()
 
+def read_data(connection, query):
+
+    cursor = connection.cursor()
     cursor.execute(query)
     data = cursor.fetchall()
-    print("Data fetched successfully")
 
     return data
-
-    #for row in rows:
-        #print(row)
 
 
 def experienceGain(pokemon):
 
     print("\nYour " + pokemon.name + " has gotten so much stronger! Which stat will " + pokemon.name + " focus on now?\n")
     stat_choice = input(bold_char + "Health\t\tAttack\t\tDefense\t\tSpeed\n" + end_char)
+    print("\n\n")
+
     stat_choice.strip().lower()
 
     if stat_choice == 'health':
@@ -330,8 +325,6 @@ def experienceGain(pokemon):
         pokemon.changeDefense(5)
     elif stat_choice == 'speed':
         pokemon.changeSpeed(5)
-
-    print("\n\n")
 
 
 def saveOpportunity(player):
@@ -372,8 +365,7 @@ def battleSequence(player, rival_pokemon):
     # Repeating loop per turn    
     while player.pokemon.current_HP > 0 and rival_pokemon.current_HP > 0:
 
-
-        # use colored underscores to show HP? 
+        # TODO use colored underscores to show HP? 
 
         print("\n" + underscores)   
         print(f"Enemy {rival_pokemon.name}" + tab_spacing + format(rival_pokemon.current_HP/rival_pokemon.maxHealth, ".1%"))
@@ -391,9 +383,7 @@ def battleSequence(player, rival_pokemon):
         # Counter does damage only if attacked. 2x of what was recieved. Always goes first.
         # Rest restores 20% HP. Vulnerable to attacks by 1.5x while resting
 
-        # TODO enemy class has an attribute of 'action list' (to influence RNG choices)
-
-        enemy_options = ["attack", "counter", "rest"]
+        enemy_options = ["attack", "attack", "attack", "counter", "counter", "rest"]
         enemy_action = random.choice(enemy_options)
 
         if player.pokemon.speed >= rival_pokemon.speed:
@@ -517,17 +507,19 @@ def battleSequence(player, rival_pokemon):
                     dmg = rival_pokemon.changeCurrentHP(rest_multiplier * damage_multiplier * (player.pokemon.attack / rival_pokemon.defense) * player.pokemon.attack)
                     print("But " + player.pokemon.name + " isn't letting up! " + rival_pokemon.name + " takes a considerable " + str(-1*round(dmg)) + " damage!\n")
 
+
+    # TODO end of battle stats
     if player.pokemon.current_HP > 0 and rival_pokemon.current_HP <= 0:
         # player wins, time to save and move on
-        pass               
+        return 1              
     elif player.pokemon.current_HP <= 0 and rival_pokemon.current_HP > 0:
         # enemy wins. restart
-        pass
+        return -1
     else:
         # Both have fainted. It's a draw
-        pass
+        return 0
 
-    print("Battle completed. Results: ")
+    print("Battle completed. Final Results: ")
     print("\n" + underscores)
     print(f"Enemy {rival_pokemon.name}" + tab_spacing + format(rival_pokemon.current_HP/rival_pokemon.maxHealth, ".1%"))
     print(underscores)
@@ -545,7 +537,7 @@ def beginFirstBattle(player, rival_pokemon):
     print(f"{player_name}! You're going down! " + rival_pokemon.name + " will make sure of it! ... " + rival_pokemon.cry + "\n")
     print(f"... {starter_name}, I choose you!" + "\n" + player.pokemon.cry)
 
-    battleSequence(player, rival_pokemon)
+    return battleSequence(player, rival_pokemon)
 
 
 

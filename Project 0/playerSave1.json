@@ -1,13 +1,13 @@
 {
     "name": "Jake",
-    "battles_won": 1,
+    "battles_won": 2,
     "pokemon": {
         "name": "Squirtle",
         "cry": "Squir, squirt!",
         "stats": [
             "Health 50",
-            "Attack 35",
-            "Defense 45",
+            "Attack 40",
+            "Defense 50",
             "Speed 35"
         ]
     }
