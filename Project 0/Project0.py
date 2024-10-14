@@ -16,12 +16,15 @@ class Trainer:
     def __init__(self, name, battles_won = 0, pokemon = None):
 
         self.name = name
-        self.battles_won = 0
+        self.battles_won = battles_won
         if pokemon != None:
             self.pokemon = pokemon
 
     def setPokemon(pokemon):
         self.pokemon = pokemon
+
+    def battleWin(self):
+        self.battles_won += 1
 
 
 class Pokemon:
@@ -68,10 +71,12 @@ class Pokemon:
         self.current_HP += value
         if self.current_HP > self.maxHealth:
             self.current_HP = self.maxHealth
-        if self.current_HP < 0:
+        if self.current_HP <= 0:
             self.current_HP = 0
 
         return value
+    
+    
 
 
 def beginSequence():
@@ -149,9 +154,16 @@ def beginSequence():
         # IF VICTORIOUS, gain exp
         if battle_result == 1:
             experienceGain(player.pokemon)
+            player.battleWin()
 
-        # Opportunity to save
-        saveOpportunity(player)
+            # Opportunity to save
+            saveOpportunity(player)
+
+            response = input("Continue?\n")
+            if response.lower() == "no":
+                return
+        else:
+            return
 
 
     connection = initializeDatabase()
@@ -192,7 +204,7 @@ def initializeDatabase():
     insert_pokemon(conn, 4, 1, 'Charmander', 45, 45, 30, 45)
     insert_pokemon(conn, 7, 1, 'Squirtle', 50, 35, 45, 35)
     insert_pokemon(conn, 19, 1, 'Rattata', 30, 40, 30, 50)
-    insert_pokemon(conn, 21, 1, 'Spearow', 25, 45, 15, 55)
+    insert_pokemon(conn, 21, 1, 'Spearow', 25, 45, 20, 55)
     insert_pokemon(conn, 25, 1, 'Pikachu', 45, 50, 35, 50)
     insert_pokemon(conn, 37, 1, 'Vulpix', 40, 45, 30, 45)
     insert_pokemon(conn, 39, 1, 'Jigglypuff', 55, 30, 40, 35)
@@ -200,8 +212,19 @@ def initializeDatabase():
     insert_pokemon(conn, 92, 1, 'Gastly', 20, 55, 15, 45)
     insert_pokemon(conn, 93, 2, 'Haunter', 40, 75, 35, 65)
     insert_pokemon(conn, 94, 3, 'Gengar', 60, 95, 55, 85)
-    insert_pokemon(conn, 129, 1, 'Magikarp', 10, 5, 5, 10)
+    insert_pokemon(conn, 129, 1, 'Magikarp', 10, 10, 10, 10)
     insert_pokemon(conn, 130, 2, 'Gyarados', 75, 75, 60, 75)
+    insert_pokemon(conn, 78, 2, 'Rapidash', 60, 50, 40, 70)
+    insert_pokemon(conn, 82, 2, 'Magneton', 80, 45, 90, 15)
+    insert_pokemon(conn, 149, 3, 'Dragonite', 100, 100, 80, 90)
+    insert_pokemon(conn, 65, 3, 'Alakazam', 75, 95, 50, 80)
+    insert_pokemon(conn, 31, 3, 'Nidoqueen', 90, 70, 90, 60)
+    insert_pokemon(conn, 34, 3, 'Nidoking', 80, 80, 70, 70)
+    insert_pokemon(conn, 59, 2, 'Arcanine', 70, 85, 60, 85)
+    insert_pokemon(conn, 8, 2, 'Wartortle', 60, 50, 60, 40)
+    insert_pokemon(conn, 9, 3, 'Blastoise', 80, 80, 80, 30)
+    insert_pokemon(conn, 6, 3, 'Charizard', 65, 90, 60, 90)
+    
 
     return conn
 
@@ -220,13 +243,17 @@ def endlessBattleLoop(player, connection):
 
     player_name = player.name
     player_pokemon = player.pokemon
-    battles_won = player.battles_won
 
     # Load opponent
-    #testQuery = "SELECT * FROM pokemon;"
+    stage = 1
+    if player.battles_won >= 5:
+        stage = 2
+    elif player.battles_won >= 10:
+        stage = 3
+
     query = """ 
     SELECT * FROM pokemon 
-    WHERE evolution_stage = 1
+    WHERE evolution_stage = """ + str(stage) + """
     ORDER BY RAND()
     LIMIT 1;
     """
@@ -248,19 +275,21 @@ def endlessBattleLoop(player, connection):
     battle_result = battleSequence(player, opponent_pokemon)
 
     # Experience gain
-    experienceGain(player.pokemon)
+    if battle_result == 1:
+        experienceGain(player.pokemon)
+        player.battleWin()
 
-    # Save
-    player.battles_won += 1
-    saveOpportunity(player)
+        # Save
+        saveOpportunity(player)
 
-    # Continue/Exit
-    choice = input("\nContinue?\n")
-    if choice.lower() == 'yes':
-        endlessBattleLoop(player, connection)
-    else:
-        print("Terminating program.")
-        pass
+        # Continue/Exit
+        choice = input("Continue?\n")
+        if choice.lower() == 'yes':
+            endlessBattleLoop(player, connection)
+        else:
+            print("Terminating program.")
+            pass
+    
 
 
 def create_connection(host_name, user_name, user_password, db_name):
@@ -325,11 +354,15 @@ def experienceGain(pokemon):
         pokemon.changeDefense(5)
     elif stat_choice == 'speed':
         pokemon.changeSpeed(5)
+    else:
+        print("\nLets try that again.")
+        experienceGain(pokemon)
 
 
 def saveOpportunity(player):
 
     save = input("Would you like to save your progress? This will overwrite previous saves.\n")
+    print("\n\n")
     save.strip().lower()
 
     if save == 'yes' or save == 'y':
@@ -355,7 +388,7 @@ def battleSequence(player, rival_pokemon):
 
     damage_multiplier = -0.35
     counter_multiplier = 2
-    rest_multiplier = 2
+    rest_multiplier = 1.5
     recover_percentage = 0.2
 
     # Make sure both Pokemon have full HP before battle
@@ -381,7 +414,7 @@ def battleSequence(player, rival_pokemon):
 
         # Attack does damage. Highest speed moves first
         # Counter does damage only if attacked. 2x of what was recieved. Always goes first.
-        # Rest restores 20% HP. Vulnerable to attacks by 1.5x while resting
+        # Rest restores 20% HP. Vulnerable to attacks while resting
 
         enemy_options = ["attack", "attack", "attack", "counter", "counter", "rest"]
         enemy_action = random.choice(enemy_options)
@@ -463,7 +496,7 @@ def battleSequence(player, rival_pokemon):
                     print(player.pokemon.name + " backs off to catch its breath.\n")
                     player.pokemon.changeCurrentHP(recover_percentage * player.pokemon.maxHealth)
 
-                elif action.lower() == 'counter':
+                elif action.lower() == 'attack':
                     # Both take damage 
                     dmg = player.pokemon.changeCurrentHP(damage_multiplier * (rival_pokemon.attack / player.pokemon.defense) * rival_pokemon.attack)
                     print(rival_pokemon.name + " attacked " + player.pokemon.name + " for " + str(-1*round(dmg)) + " damage!\n")
@@ -473,7 +506,7 @@ def battleSequence(player, rival_pokemon):
             elif enemy_action == 'counter':         # Enemy attempts to counter
                 if action.lower() == 'counter':   
                     # Nothing happens
-                    print(rival_pokemon.name+ " tried to counter! " + player.pokemon.name + " responds with... a counter of its own! Nothing happened.")
+                    print(rival_pokemon.name+ " tried to counter! " + player.pokemon.name + " also tried to counterattack! Nothing happened.")
 
                 elif action == 'rest': 
                     # Player restores HP
@@ -502,29 +535,33 @@ def battleSequence(player, rival_pokemon):
 
                 elif action == 'attack':
                     # Ally attacks, enemy takes bonus resting damage
-                    print(rival_pokemon.name + " backs off to catch its breath.\n")
+                    print(rival_pokemon.name + " backs off out of fear!\n")
                     rival_pokemon.changeCurrentHP(recover_percentage * rival_pokemon.maxHealth)
                     dmg = rival_pokemon.changeCurrentHP(rest_multiplier * damage_multiplier * (player.pokemon.attack / rival_pokemon.defense) * player.pokemon.attack)
                     print("But " + player.pokemon.name + " isn't letting up! " + rival_pokemon.name + " takes a considerable " + str(-1*round(dmg)) + " damage!\n")
 
-
-    # TODO end of battle stats
-    if player.pokemon.current_HP > 0 and rival_pokemon.current_HP <= 0:
-        # player wins, time to save and move on
-        return 1              
-    elif player.pokemon.current_HP <= 0 and rival_pokemon.current_HP > 0:
-        # enemy wins. restart
-        return -1
-    else:
-        # Both have fainted. It's a draw
-        return 0
 
     print("Battle completed. Final Results: ")
     print("\n" + underscores)
     print(f"Enemy {rival_pokemon.name}" + tab_spacing + format(rival_pokemon.current_HP/rival_pokemon.maxHealth, ".1%"))
     print(underscores)
     print(f"{player.pokemon.name}" + tab_spacing + format(player.pokemon.current_HP/player.pokemon.maxHealth, ".1%"))
-    print(underscores)
+    print(underscores + "\n\n")
+
+    if player.pokemon.current_HP > 0 and rival_pokemon.current_HP <= 0:
+        # player wins, time to save and move on
+        print(rival_pokemon.name + " has been knocked out! " + player.name + " is victorious! \n")
+        return 1              
+    elif player.pokemon.current_HP <= 0 and rival_pokemon.current_HP > 0:
+        # enemy wins. restart
+        print(player.pokemon.name + " has been knocked out! " + player.name + " has been defeated!\n")
+        return -1
+    else:
+        # Both have fainted. It's a draw
+        print("Both " + player.pokemon.name + " and " + rival_pokemon.name + " have both collapsed! Neither one can continue. This battle is a draw!\n")
+        return 0
+
+    
     
 
 
